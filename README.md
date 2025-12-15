@@ -97,34 +97,56 @@ public class InputService {
 
 These methods **must** be declared in your Java class:
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `vncInit` | `()V` | Initialize the VNC runtime |
-| `vncStartServer` | `(IIILjava/lang/String;Ljava/lang/String;Ljava/lang/String;)Z` | Start VNC server |
-| `vncStopServer` | `()Z` | Stop VNC server |
-| `vncIsActive` | `()Z` | Check if server is running |
-| `vncConnectRepeater` | `(Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;)J` | Connect to repeater |
+```java
+// Initialize the VNC runtime (call once at startup)
+private static native void vncInit();
+
+// Start VNC server with given dimensions, port, name, password, and HTTP root dir
+private native boolean vncStartServer(int width, int height, int port,
+                                      String desktopName, String password, String httpRootDir);
+
+// Stop the VNC server
+private native boolean vncStopServer();
+
+// Check if the server is currently running
+private native boolean vncIsActive();
+
+// Connect to a UltraVNC repeater
+private native long vncConnectRepeater(String host, int port, String repeaterId, String requestId);
+```
 
 ### Optional Methods
 
 These methods are registered only if declared in your Java class:
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `vncUpdateFramebuffer` | `(Ljava/nio/ByteBuffer;)Z` | Update framebuffer from ByteBuffer |
-| `vncUpdateFramebufferAndSend` | `(Ljava/nio/ByteBuffer;II)Z` | Update and send framebuffer |
-| `vncUpdateFramebufferCropped` | `(Ljava/nio/ByteBuffer;IIIIII)Z` | Update cropped region |
-| `vncNewFramebuffer` | `(II)Z` | Resize framebuffer |
-| `vncSendCutText` | `(Ljava/lang/String;)V` | Send clipboard text |
-| `vncGetFramebufferWidth` | `()I` | Get framebuffer width |
-| `vncGetFramebufferHeight` | `()I` | Get framebuffer height |
-| `vncConnectReverse` | `(Ljava/lang/String;I)J` | Connect to listening viewer |
-| `vncGetRemoteHost` | `(J)Ljava/lang/String;` | Get client's remote host |
-| `vncGetDestinationPort` | `(J)I` | Get client's destination port |
-| `vncGetRepeaterId` | `(J)Ljava/lang/String;` | Get client's repeater ID |
-| `vncDisconnect` | `(J)Z` | Disconnect specific client |
-| `vncScheduleCopyRect` | `(IIIIII)V` | Schedule CopyRect operation |
-| `vncDoCopyRect` | `(IIIIII)Z` | Execute CopyRect operation |
+```java
+// Framebuffer updates
+static native boolean vncUpdateFramebuffer(ByteBuffer buf);
+static native boolean vncUpdateFramebufferAndSend(ByteBuffer buf, int width, int height);
+static native boolean vncUpdateFramebufferCropped(ByteBuffer buf, int width, int height,
+                                                   int cropX, int cropY, int cropWidth, int cropHeight);
+static native boolean vncNewFramebuffer(int width, int height);
+
+// Framebuffer info
+static native int vncGetFramebufferWidth();
+static native int vncGetFramebufferHeight();
+
+// Clipboard
+static native void vncSendCutText(String text);
+
+// Connections
+static native long vncConnectReverse(String host, int port);
+
+// Client info (pass clientId from callbacks)
+static native String vncGetRemoteHost(long clientId);
+static native int vncGetDestinationPort(long clientId);
+static native String vncGetRepeaterId(long clientId);
+static native boolean vncDisconnect(long clientId);
+
+// CopyRect optimization (for scrolling/window dragging)
+static native void vncScheduleCopyRect(int srcX, int srcY, int width, int height, int dstX, int dstY);
+static native boolean vncDoCopyRect(int srcX, int srcY, int width, int height, int dstX, int dstY);
+```
 
 ## Callbacks
 
