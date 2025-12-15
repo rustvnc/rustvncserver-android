@@ -14,50 +14,9 @@
 
 //! Build script for rustvncserver-android.
 //!
-//! Reads environment variables to configure the JNI class names at compile time.
-//!
-//! # Environment Variables
-//!
-//! - `VNC_PACKAGE` - Java package path (e.g., "com/example/vnc"). Required for standalone build.
-//! - `VNC_MAIN_SERVICE` - Main service class name (default: "MainService")
-//! - `VNC_INPUT_SERVICE` - Input service class name (default: "InputService")
-//! - `VNC_LOG_TAG` - Android log tag (default: "RustVNC")
-//!
-//! # Example
-//!
-//! ```bash
-//! VNC_PACKAGE="com/example/vnc" cargo build --release
-//! ```
+//! This build script is minimal - configuration is done at runtime via
+//! Java system properties rather than compile-time environment variables.
 
 fn main() {
-    // Tell Cargo/clippy that vnc_standalone is a valid cfg flag
-    println!("cargo::rustc-check-cfg=cfg(vnc_standalone)");
-
-    // Re-run if these env vars change
-    println!("cargo:rerun-if-env-changed=VNC_PACKAGE");
-    println!("cargo:rerun-if-env-changed=VNC_MAIN_SERVICE");
-    println!("cargo:rerun-if-env-changed=VNC_INPUT_SERVICE");
-    println!("cargo:rerun-if-env-changed=VNC_LOG_TAG");
-
-    // Check if VNC_PACKAGE is set - if so, enable standalone mode
-    if let Ok(package) = std::env::var("VNC_PACKAGE") {
-        println!("cargo:rustc-cfg=vnc_standalone");
-        println!("cargo:rustc-env=VNC_PACKAGE={}", package);
-
-        let main_service =
-            std::env::var("VNC_MAIN_SERVICE").unwrap_or_else(|_| "MainService".to_string());
-        println!("cargo:rustc-env=VNC_MAIN_SERVICE={}", main_service);
-
-        let input_service =
-            std::env::var("VNC_INPUT_SERVICE").unwrap_or_else(|_| "InputService".to_string());
-        println!("cargo:rustc-env=VNC_INPUT_SERVICE={}", input_service);
-
-        let log_tag = std::env::var("VNC_LOG_TAG").unwrap_or_else(|_| "RustVNC".to_string());
-        println!("cargo:rustc-env=VNC_LOG_TAG={}", log_tag);
-
-        eprintln!(
-            "rustvncserver-android: Building standalone .so for {}/{}",
-            package, main_service
-        );
-    }
+    // Nothing to do - all configuration is runtime via system properties
 }

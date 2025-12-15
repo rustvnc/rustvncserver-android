@@ -14,35 +14,58 @@
 
 //! Generic Android JNI bindings for rustvncserver.
 //!
-//! This crate compiles directly to a `.so` file that can be used by any Android app.
-//! No wrapper crate needed - just configure your Java package at build time!
+//! This crate provides a ready-to-use VNC server for Android apps. Simply add it as a
+//! dependency and configure your Java class names via system properties at runtime.
 //!
-//! # Usage
+//! # Quick Start
 //!
-//! Build with environment variables to configure your app's Java package:
+//! 1. Add to your `Cargo.toml`:
 //!
-//! ```bash
-//! VNC_PACKAGE="com/mycompany/vnc" cargo ndk -t arm64-v8a build --release
+//! ```toml
+//! [dependencies]
+//! rustvncserver-android = { version = "1.0", features = ["turbojpeg"] }
 //! ```
 //!
-//! Then copy `librustvncserver_android.so` to your app's `jniLibs` folder (rename as needed).
+//! 2. In your Java code, set system properties BEFORE loading the library:
 //!
-//! # Environment Variables
+//! ```java
+//! public class MainService extends Service {
+//!     static {
+//!         // Configure class names (use / instead of . in package path)
+//!         System.setProperty("rustvnc.main_service_class", "com/mycompany/vnc/MainService");
+//!         System.setProperty("rustvnc.input_service_class", "com/mycompany/vnc/InputService");
+//!         System.setProperty("rustvnc.log_tag", "MyApp-VNC");  // Optional
 //!
-//! - `VNC_PACKAGE` - Java package path (required), e.g., `"com/example/vnc"`
-//! - `VNC_MAIN_SERVICE` - Main service class name (default: `"MainService"`)
-//! - `VNC_INPUT_SERVICE` - Input service class name (default: `"InputService"`)
-//! - `VNC_LOG_TAG` - Android log tag (default: `"RustVNC"`)
+//!         // Load the library - JNI_OnLoad will register natives automatically
+//!         System.loadLibrary("rustvncserver_android");
+//!     }
+//! }
+//! ```
 //!
-//! # Example Gradle Integration
+//! # System Properties
 //!
-//! ```groovy
-//! def vncPackage = "com/mycompany/vnc"
+//! - `rustvnc.main_service_class` - Full class path for MainService (required)
+//! - `rustvnc.input_service_class` - Full class path for InputService (required)
+//! - `rustvnc.log_tag` - Android log tag (default: `"RustVNC"`)
 //!
-//! environment "VNC_PACKAGE", vncPackage
-//! environment "VNC_LOG_TAG", "MyApp-VNC"
+//! # Alternative: Manual Registration
 //!
-//! commandLine 'cargo', 'ndk', '-t', 'arm64-v8a', 'build', '--release'
+//! If you prefer to register natives manually (e.g., from a wrapper crate), don't set
+//! the system properties and call [`register_vnc_natives`] from your own `JNI_OnLoad`:
+//!
+//! ```rust,ignore
+//! use rustvncserver_android::register_vnc_natives;
+//!
+//! #[no_mangle]
+//! pub extern "system" fn JNI_OnLoad(vm: JavaVM, _: *mut c_void) -> jint {
+//!     let mut env = vm.get_env().unwrap();
+//!     register_vnc_natives(
+//!         &mut env,
+//!         "com/mycompany/vnc/MainService",
+//!         "com/mycompany/vnc/InputService",
+//!     ).expect("Failed to register VNC natives");
+//!     JNI_VERSION_1_6
+//! }
 //! ```
 //!
 //! # Java Side Requirements
@@ -215,11 +238,6 @@ fn register_main_service_natives(env: &mut JNIEnv, class: JClass) -> Result<(), 
     // Required methods - registration fails if any are missing
     let required_methods: Vec<NativeMethod> = vec![
         NativeMethod {
-            name: "vncInit".into(),
-            sig: "()V".into(),
-            fn_ptr: native_vnc_init as *mut std::ffi::c_void,
-        },
-        NativeMethod {
             name: "vncStartServer".into(),
             sig: "(IIILjava/lang/String;Ljava/lang/String;Ljava/lang/String;)Z".into(),
             fn_ptr: native_vnc_start_server as *mut std::ffi::c_void,
@@ -246,6 +264,11 @@ fn register_main_service_natives(env: &mut JNIEnv, class: JClass) -> Result<(), 
 
     // Optional methods - registered individually, skip if missing
     let optional_methods: Vec<NativeMethod> = vec![
+        NativeMethod {
+            name: "vncInit".into(),
+            sig: "()V".into(),
+            fn_ptr: native_vnc_init as *mut std::ffi::c_void,
+        },
         NativeMethod {
             name: "vncUpdateFramebuffer".into(),
             sig: "(Ljava/nio/ByteBuffer;)Z".into(),
@@ -1429,69 +1452,140 @@ fn handle_server_event(event: ServerEvent) {
 }
 
 // ============================================================================
-// Standalone JNI_OnLoad (when VNC_PACKAGE env var is set at build time)
+// JNI_OnLoad - Always exported, reads class names from system properties
 // ============================================================================
 
-/// JNI_OnLoad for standalone builds.
+/// JNI_OnLoad entry point - called when the library is loaded.
 ///
-/// This is automatically included when building with `VNC_PACKAGE` environment variable.
-/// No wrapper crate needed - just build this crate directly and use the .so file.
+/// This function reads class names from Java system properties and registers
+/// native methods automatically. Set these properties BEFORE calling
+/// `System.loadLibrary()`:
 ///
-/// # Example Build
-///
-/// ```bash
-/// VNC_PACKAGE="com/example/vnc" cargo build --release --target aarch64-linux-android
+/// ```java
+/// static {
+///     System.setProperty("rustvnc.main_service_class", "com/elo/vnc/MainService");
+///     System.setProperty("rustvnc.input_service_class", "com/elo/vnc/InputService");
+///     System.setProperty("rustvnc.log_tag", "MyApp-VNC");  // Optional
+///     System.loadLibrary("rustvncserver_android");
+/// }
 /// ```
 ///
-/// Or with custom class names:
-///
-/// ```bash
-/// VNC_PACKAGE="com/myapp" VNC_MAIN_SERVICE="VncService" cargo build --release
-/// ```
-#[cfg(vnc_standalone)]
+/// If properties are not set, JNI_OnLoad will store the JavaVM but skip
+/// native registration. You can then call `register_vnc_natives()` manually
+/// from a wrapper crate's JNI_OnLoad.
 #[no_mangle]
 pub extern "system" fn JNI_OnLoad(
-    vm: jni::JavaVM,
+    jvm: jni::JavaVM,
     _reserved: *mut std::ffi::c_void,
 ) -> jni::sys::jint {
     use jni::sys::{JNI_ERR, JNI_VERSION_1_6};
 
-    // Initialize Android logger with configured tag
-    android_logger::init_once(
-        android_logger::Config::default()
-            .with_max_level(log::LevelFilter::Info)
-            .with_tag(env!("VNC_LOG_TAG")),
-    );
-
-    info!("JNI_OnLoad: Registering VNC native methods");
-
     // Get JNI environment
-    let mut env = match vm.get_env() {
+    let mut env = match jvm.get_env() {
         Ok(env) => env,
         Err(e) => {
-            error!("Failed to get JNI environment: {}", e);
+            // Can't log yet, just return error
+            eprintln!("JNI_OnLoad: Failed to get JNI environment: {}", e);
             return JNI_ERR;
         }
     };
 
-    // Build full class names from compile-time env vars
-    let main_class = concat!(env!("VNC_PACKAGE"), "/", env!("VNC_MAIN_SERVICE"));
-    let input_class = concat!(env!("VNC_PACKAGE"), "/", env!("VNC_INPUT_SERVICE"));
+    // Store the JavaVM (needed for callbacks later)
+    // Get it from the env to avoid borrowing issues
+    if let Ok(java_vm) = env.get_java_vm() {
+        let _ = JAVA_VM.set(java_vm);
+    }
 
-    info!(
-        "Registering for classes: {} and {}",
-        main_class, input_class
+    // Try to read log tag from system property, default to "RustVNC"
+    let log_tag =
+        read_system_property(&mut env, "rustvnc.log_tag").unwrap_or_else(|| "RustVNC".to_string());
+
+    // Initialize Android logger
+    // Note: We leak the string to get a 'static lifetime, but this only happens once
+    let log_tag_static: &'static str = Box::leak(log_tag.into_boxed_str());
+    android_logger::init_once(
+        android_logger::Config::default()
+            .with_max_level(log::LevelFilter::Info)
+            .with_tag(log_tag_static),
     );
 
-    // Register native methods
-    match register_vnc_natives(&mut env, main_class, input_class) {
-        Ok(()) => {
-            info!("VNC native methods registered successfully");
-            JNI_VERSION_1_6
+    info!("JNI_OnLoad: rustvncserver-android loaded");
+
+    // Try to read class names from system properties
+    let main_class = read_system_property(&mut env, "rustvnc.main_service_class");
+    let input_class = read_system_property(&mut env, "rustvnc.input_service_class");
+
+    match (main_class, input_class) {
+        (Some(main), Some(input)) => {
+            info!("JNI_OnLoad: Registering natives for {} and {}", main, input);
+
+            match register_vnc_natives(&mut env, &main, &input) {
+                Ok(()) => {
+                    info!("VNC native methods registered successfully");
+                    // Initialize runtime and server container
+                    get_or_init_vnc_runtime();
+                    get_or_init_shutdown_signal();
+                    VNC_SERVER.get_or_init(|| Arc::new(Mutex::new(None)));
+                    info!("VNC runtime initialized");
+                }
+                Err(e) => {
+                    error!("Failed to register VNC native methods: {}", e);
+                    return JNI_ERR;
+                }
+            }
         }
-        Err(e) => {
-            error!("Failed to register VNC native methods: {}", e);
-            JNI_ERR
+        (None, None) => {
+            info!(
+                "JNI_OnLoad: No class properties set, skipping auto-registration. \
+                 Set rustvnc.main_service_class and rustvnc.input_service_class \
+                 before System.loadLibrary(), or call register_vnc_natives() manually."
+            );
         }
+        (main, input) => {
+            error!(
+                "JNI_OnLoad: Partial configuration - main_service_class={:?}, input_service_class={:?}. \
+                 Both must be set or neither.",
+                main, input
+            );
+            return JNI_ERR;
+        }
+    }
+
+    JNI_VERSION_1_6
+}
+
+/// Reads a Java system property.
+///
+/// Returns `None` if the property is not set or if there's an error reading it.
+fn read_system_property(env: &mut JNIEnv, property_name: &str) -> Option<String> {
+    // Find java.lang.System class
+    let system_class = env.find_class("java/lang/System").ok()?;
+
+    // Create property name string
+    let prop_name_jstr = env.new_string(property_name).ok()?;
+
+    // Call System.getProperty(String)
+    let result = env
+        .call_static_method(
+            system_class,
+            "getProperty",
+            "(Ljava/lang/String;)Ljava/lang/String;",
+            &[JValue::Object(&prop_name_jstr.into())],
+        )
+        .ok()?;
+
+    // Extract the string result
+    let jobj = result.l().ok()?;
+    if jobj.is_null() {
+        return None;
+    }
+
+    let jstr = JString::from(jobj);
+    let rust_str: String = env.get_string(&jstr).ok()?.into();
+
+    if rust_str.is_empty() {
+        None
+    } else {
+        Some(rust_str)
     }
 }

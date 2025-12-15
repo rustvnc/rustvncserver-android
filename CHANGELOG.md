@@ -5,6 +5,38 @@ All notable changes to rustvncserver-android will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2025-12-15
+
+### Changed
+
+- **BREAKING**: Switched from build-time to runtime configuration
+  - JNI_OnLoad now reads class names from Java system properties instead of compile-time environment variables
+  - Set `rustvnc.main_service_class`, `rustvnc.input_service_class`, and optionally `rustvnc.log_tag` before calling `System.loadLibrary()`
+- Removed build.rs compile-time configuration (VNC_PACKAGE, VNC_MAIN_SERVICE, VNC_INPUT_SERVICE, VNC_LOG_TAG environment variables no longer used)
+- JNI_OnLoad is now always exported (no longer requires `#[cfg(vnc_standalone)]`)
+- Can now be used as a crates.io dependency without any custom JNI code - just re-export and set system properties
+
+### Added
+
+- `read_system_property()` internal function for reading Java system properties from Rust
+- Automatic native method registration when system properties are set
+- Graceful fallback when properties not set (allows manual registration via `register_vnc_natives()`)
+
+### Migration Guide
+
+**Before (v1.0.x):**
+```bash
+VNC_PACKAGE="com/mycompany/vnc" cargo ndk build --release
+```
+
+**After (v1.1.0):**
+```java
+// In Java, before System.loadLibrary():
+System.setProperty("rustvnc.main_service_class", "com/mycompany/vnc/MainService");
+System.setProperty("rustvnc.input_service_class", "com/mycompany/vnc/InputService");
+System.loadLibrary("your_lib_name");
+```
+
 ## [1.0.1] - 2025-12-15
 
 ### Changed

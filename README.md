@@ -17,10 +17,11 @@ Generic Android JNI bindings for [rustvncserver](https://github.com/rustvnc/rust
 
 ## Overview
 
-This crate provides ready-to-use Android JNI bindings for the rustvncserver library. It compiles directly to a `.so` file that can be loaded by any Android app - **no wrapper crate needed**.
+This crate provides ready-to-use Android JNI bindings for the rustvncserver library. It uses **runtime configuration** via Java system properties - just set properties before loading the library and everything is configured automatically.
 
 **Key Features:**
-- Build-time configurable Java package via environment variables
+- Runtime configurable Java package via system properties (no build-time config needed)
+- Use as a crates.io dependency - no custom JNI code required
 - Flexible JNI method registration (required vs optional methods)
 - Full VNC server lifecycle management
 - TurboJPEG support for hardware-accelerated JPEG compression
@@ -28,68 +29,87 @@ This crate provides ready-to-use Android JNI bindings for the rustvncserver libr
 
 ## Quick Start
 
-### 1. Build the Library
+### Option 1: As a Dependency (Recommended)
 
-```bash
-# Set your Java package path
-export VNC_PACKAGE="com/mycompany/vnc"
-export VNC_MAIN_SERVICE="MainService"      # Optional, defaults to "MainService"
-export VNC_INPUT_SERVICE="InputService"    # Optional, defaults to "InputService"
-export VNC_LOG_TAG="MyApp-VNC"             # Optional, defaults to "RustVNC"
+Add to your `Cargo.toml`:
 
-# Build for Android
-cargo ndk -t arm64-v8a build --release --features turbojpeg
+```toml
+[package]
+name = "my-vnc-app"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+rustvncserver-android = { version = "1.0", features = ["turbojpeg"] }
 ```
 
-### 2. Copy to Your App
+Create a minimal `src/lib.rs`:
 
-```bash
-cp target/aarch64-linux-android/release/librustvncserver_android.so \
-   app/src/main/jniLibs/arm64-v8a/
+```rust
+// Re-export everything including JNI_OnLoad
+pub use rustvncserver_android::*;
 ```
 
-### 3. Add Java Native Methods
+In your Java code, set system properties BEFORE loading the library:
 
 ```java
 public class MainService extends Service {
     static {
-        System.loadLibrary("rustvncserver_android");
-        vncInit();
+        // Configure class names (use / instead of . in package path)
+        System.setProperty("rustvnc.main_service_class", "com/mycompany/vnc/MainService");
+        System.setProperty("rustvnc.input_service_class", "com/mycompany/vnc/InputService");
+        System.setProperty("rustvnc.log_tag", "MyApp-VNC");  // Optional
+
+        // Load the library - JNI_OnLoad registers natives automatically
+        System.loadLibrary("my_vnc_app");
     }
 
-    // Required native methods
-    private static native void vncInit();
+    // Native methods are now available!
     private native boolean vncStartServer(int width, int height, int port,
                                           String desktopName, String password, String httpRootDir);
-    private native boolean vncStopServer();
-    private native boolean vncIsActive();
-    private native long vncConnectRepeater(String host, int port, String repeaterId, String requestId);
-
-    // Optional native methods (only declare if you use them)
-    static native boolean vncUpdateFramebuffer(ByteBuffer buf);
-    static native boolean vncNewFramebuffer(int width, int height);
     // ... see full list below
-
-    // Callbacks (called from Rust)
-    public static void onClientConnected(long clientId) { /* ... */ }
-    public static void onClientDisconnected(long clientId) { /* ... */ }
-}
-
-public class InputService {
-    public static void onKeyEvent(int down, long keysym, long clientId) { /* ... */ }
-    public static void onPointerEvent(int buttonMask, int x, int y, long clientId) { /* ... */ }
-    public static void onCutText(String text, long clientId) { /* ... */ }
 }
 ```
 
-## Environment Variables
+### Option 2: Manual Registration
 
-| Variable | Required | Default | Description |
+If you need more control, skip the system properties and call `register_vnc_natives()` from your own `JNI_OnLoad`:
+
+```rust
+use rustvncserver_android::register_vnc_natives;
+use jni::JavaVM;
+use jni::sys::{jint, JNI_VERSION_1_6, JNI_ERR};
+use std::ffi::c_void;
+
+#[no_mangle]
+pub extern "system" fn JNI_OnLoad(vm: JavaVM, _: *mut c_void) -> jint {
+    let mut env = match vm.get_env() {
+        Ok(env) => env,
+        Err(_) => return JNI_ERR,
+    };
+
+    match register_vnc_natives(
+        &mut env,
+        "com/mycompany/vnc/MainService",
+        "com/mycompany/vnc/InputService",
+    ) {
+        Ok(()) => JNI_VERSION_1_6,
+        Err(_) => JNI_ERR,
+    }
+}
+```
+
+## System Properties
+
+Set these properties in Java **before** calling `System.loadLibrary()`:
+
+| Property | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `VNC_PACKAGE` | Yes | - | Java package path (e.g., `com/mycompany/vnc`) |
-| `VNC_MAIN_SERVICE` | No | `MainService` | Main service class name |
-| `VNC_INPUT_SERVICE` | No | `InputService` | Input service class name |
-| `VNC_LOG_TAG` | No | `RustVNC` | Android logcat tag |
+| `rustvnc.main_service_class` | Yes | - | Full class path (e.g., `com/mycompany/vnc/MainService`) |
+| `rustvnc.input_service_class` | Yes | - | Full class path (e.g., `com/mycompany/vnc/InputService`) |
+| `rustvnc.log_tag` | No | `RustVNC` | Android logcat tag |
 
 ## Native Methods
 
@@ -98,9 +118,6 @@ public class InputService {
 These methods **must** be declared in your Java class:
 
 ```java
-// Initialize the VNC runtime (call once at startup)
-private static native void vncInit();
-
 // Start VNC server with given dimensions, port, name, password, and HTTP root dir
 private native boolean vncStartServer(int width, int height, int port,
                                       String desktopName, String password, String httpRootDir);
@@ -175,11 +192,8 @@ Example `build.gradle` task for building the Rust library:
 
 ```groovy
 tasks.register('buildRust', Exec) {
-    def vncPackage = "com/mycompany/vnc"
     def ndkDir = android.ndkDirectory.absolutePath
 
-    environment "VNC_PACKAGE", vncPackage
-    environment "VNC_LOG_TAG", "MyApp-VNC"
     environment "ANDROID_NDK_ROOT", ndkDir
 
     commandLine 'cargo', 'ndk', '-t', 'arm64-v8a', '-o',
@@ -237,4 +251,4 @@ Apache-2.0 - See [LICENSE](LICENSE) file for details.
 
 ---
 
-**Android JNI bindings for rustvncserver - Build-time configurable, production ready**
+**Android JNI bindings for rustvncserver - Runtime configurable, production ready**
