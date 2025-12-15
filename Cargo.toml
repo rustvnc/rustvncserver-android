@@ -1,0 +1,36 @@
+[package]
+name = "rustvncserver-android"
+version = "1.0.0"
+edition = "2021"
+authors = ["Dustin McAfee <dustin.mcafee@my.maryvillecollege.edu>"]
+license = "Apache-2.0"
+description = "Generic Android JNI bindings for rustvncserver"
+repository = "https://github.com/rustvnc/rustvncserver-android"
+keywords = ["vnc", "android", "jni", "rfb"]
+categories = ["network-programming", "api-bindings"]
+build = "build.rs"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[build-dependencies]
+
+[dependencies]
+# VNC server implementation
+rustvncserver = "2.1.0-beta.1"
+
+# Async runtime
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"] }
+
+# Logging
+log = "0.4"
+android_logger = "0.15"
+
+# JNI bindings
+jni = "0.21"
+once_cell = "1.19"
+
+[features]
+default = []
+turbojpeg = ["rustvncserver/turbojpeg"]
+debug-logging = ["rustvncserver/debug-logging"]
