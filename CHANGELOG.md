@@ -5,6 +5,20 @@ All notable changes to rustvncserver-android will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2025-12-17
+
+### Changed
+
+- Updated `rustvncserver` dependency from `2.1.0-beta` to `2.2.0-beta`
+
+### Fixed
+
+- **Critical ZRLE encoding bug:** Fixed buffer overflow on non-standard dimensions
+  - Root cause: Hardcoded `bytes_per_pixel = 4` instead of using `PixelFormat::bytes_per_pixel()`
+  - Affected screen resolutions not divisible by 64 (e.g., 960x540)
+  - Fixed CPIXEL size calculation per RFC 6143
+  - Fixed input buffer validation to use correct bytes per pixel
+
 ## [1.1.0] - 2025-12-15
 
 ### Changed

@@ -339,9 +339,9 @@ checksum = "7a2d987857b319362043e95f5353c0535c1f58eec5336fdfcf626430af7def58"
 
 [[package]]
 name = "rfb-encodings"
-version = "0.1.5"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08833e4acd152dcc9ecffeb257459d0412d27194156c20cc5dce81ad99085b4b"
+checksum = "4c57e06c533e688712e89ae37a4e4d4106d1aa62db34548311b0f2b3cb774e14"
 dependencies = [
  "bytes",
  "flate2",
@@ -351,9 +351,9 @@ dependencies = [
 
 [[package]]
 name = "rustvncserver"
-version = "2.1.0-beta.1"
+version = "2.2.0-beta.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f81667625c4e1de8db485851b9855d3ffe1a0c04d86a76d3ca52a8e3846048ff"
+checksum = "dae89030d2cd0f007aebe6cbbc265d0dd3d023d64a79ae761668396b6b023c60"
 dependencies = [
  "bytes",
  "des",
@@ -367,7 +367,7 @@ dependencies = [
 
 [[package]]
 name = "rustvncserver-android"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "android_logger",
  "jni",
