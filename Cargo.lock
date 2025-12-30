@@ -351,9 +351,9 @@ dependencies = [
 
 [[package]]
 name = "rustvncserver"
-version = "2.2.0-beta.1"
+version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dae89030d2cd0f007aebe6cbbc265d0dd3d023d64a79ae761668396b6b023c60"
+checksum = "e4d5d4e27926d6ba1b921a4a23cfdc6708910ea092ffbb88ab526268b3a1dbbf"
 dependencies = [
  "bytes",
  "des",
@@ -367,7 +367,7 @@ dependencies = [
 
 [[package]]
 name = "rustvncserver-android"
-version = "1.2.0"
+version = "1.3.0"
 dependencies = [
  "android_logger",
  "jni",
