@@ -17,7 +17,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # VNC server implementation
-rustvncserver = "2.2.0"
+rustvncserver = "2.2.1"
 
 # Async runtime
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"] }
