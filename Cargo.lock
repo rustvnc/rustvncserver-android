@@ -339,9 +339,9 @@ checksum = "7a2d987857b319362043e95f5353c0535c1f58eec5336fdfcf626430af7def58"
 
 [[package]]
 name = "rfb-encodings"
-version = "0.1.6"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c57e06c533e688712e89ae37a4e4d4106d1aa62db34548311b0f2b3cb774e14"
+checksum = "8256cc2cc1352ecdad7954cf053ae8c619067fe36b32ca4f3095a9079eaab0c0"
 dependencies = [
  "bytes",
  "flate2",
@@ -351,9 +351,9 @@ dependencies = [
 
 [[package]]
 name = "rustvncserver"
-version = "2.2.0"
+version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e4d5d4e27926d6ba1b921a4a23cfdc6708910ea092ffbb88ab526268b3a1dbbf"
+checksum = "e01b2f51293e6d8f21ed834009e839439d250b8233f461ddb88f4a750a4e026e"
 dependencies = [
  "bytes",
  "des",
